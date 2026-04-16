@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Somya Fashions"
+version = "1.0.0"
+id = "artifacts/somya-fashions"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18169
+
+[services.development]
+run = "pnpm --filter @workspace/somya-fashions run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/somya-fashions", "run", "build" ]
+publicDir = "artifacts/somya-fashions/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18169"
+BASE_PATH = "/"

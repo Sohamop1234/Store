@@ -1,0 +1,32 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "CYQVt268Zrn_0n1Ov0vmH"
+uri = "file://artifacts/somya-fashions/public/images/hero.png"
+type = "image"
+title = "Jewellery boutique hero banner"
+
+[[generated]]
+id = "r_CJOXcVqpc73NnynmVz3"
+uri = "file://artifacts/somya-fashions/public/images/category-necklaces.png"
+type = "image"
+title = "Gold necklace on dark background"
+
+[[generated]]
+id = "ECHnKaXcOqgeb-qRRBOPQ"
+uri = "file://artifacts/somya-fashions/public/images/category-earrings.png"
+type = "image"
+title = "Gold earrings luxury photo"
+
+[[generated]]
+id = "CqhnuVa59IIrsiIUbF15t"
+uri = "file://artifacts/somya-fashions/public/images/category-bangles.png"
+type = "image"
+title = "Gold bangles luxury photo"
+
+[[generated]]
+id = "FbA_nrvrVcsNhVtPAbpLN"
+uri = "file://artifacts/somya-fashions/public/images/category-rings.png"
+type = "image"
+title = "Gold ring luxury photo"
