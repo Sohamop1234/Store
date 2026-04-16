@@ -5,11 +5,14 @@ import {
   ListProductsQueryParams,
   CreateProductBody,
   GetProductParams,
+  UpdateProductParams,
+  UpdateProductBody,
+  DeleteProductParams,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
-router.get("/products/featured", async (req, res): Promise<void> => {
+router.get("/products/featured", async (_req, res): Promise<void> => {
   const products = await db
     .select()
     .from(productsTable)
@@ -88,6 +91,52 @@ router.post("/products", async (req, res): Promise<void> => {
 
   const [product] = await db.insert(productsTable).values(parsed.data).returning();
   res.status(201).json(product);
+});
+
+router.put("/products/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = UpdateProductParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const parsed = UpdateProductBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  // Filter out undefined fields
+  const updates: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(parsed.data)) {
+    if (v !== undefined) updates[k] = v;
+  }
+
+  const [product] = await db
+    .update(productsTable)
+    .set(updates)
+    .where(eq(productsTable.id, params.data.id))
+    .returning();
+
+  if (!product) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  res.json(product);
+});
+
+router.delete("/products/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = DeleteProductParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  await db.delete(productsTable).where(eq(productsTable.id, params.data.id));
+  res.sendStatus(204);
 });
 
 export default router;

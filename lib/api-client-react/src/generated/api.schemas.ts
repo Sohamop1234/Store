@@ -41,6 +41,20 @@ export interface CreateProductBody {
   tags: string[];
 }
 
+export interface UpdateProductBody {
+  name?: string;
+  description?: string;
+  price?: number;
+  originalPrice?: number | null;
+  category?: string;
+  imageUrl?: string;
+  images?: string[];
+  inStock?: boolean;
+  featured?: boolean;
+  material?: string;
+  tags?: string[];
+}
+
 export interface CategorySummary {
   name: string;
   count: number;
@@ -89,6 +103,101 @@ export interface Order {
   status: string;
   items: CartItem[];
   createdAt: string;
+}
+
+export interface Customer {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  pincode: string;
+  totalOrders: number;
+  totalSpent: number;
+  createdAt: string;
+}
+
+export interface Payment {
+  id: number;
+  orderId: number;
+  method: string;
+  status: string;
+  amount: number;
+  transactionRef?: string | null;
+  upiId?: string | null;
+  createdAt: string;
+}
+
+export type CreatePaymentBodyMethod =
+  (typeof CreatePaymentBodyMethod)[keyof typeof CreatePaymentBodyMethod];
+
+export const CreatePaymentBodyMethod = {
+  upi: "upi",
+  card: "card",
+  cod: "cod",
+} as const;
+
+export interface CreatePaymentBody {
+  orderId: number;
+  method: CreatePaymentBodyMethod;
+  upiId?: string | null;
+  cardLast4?: string | null;
+}
+
+export interface ConfirmPaymentBody {
+  transactionRef: string;
+}
+
+export interface AdminLoginBody {
+  password: string;
+}
+
+export interface AdminLoginResponse {
+  token: string;
+  success: boolean;
+}
+
+export type AdminOrderItemsItem = { [key: string]: unknown };
+
+export interface AdminOrder {
+  id: number;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  address: string;
+  city: string;
+  pincode: string;
+  total: number;
+  status: string;
+  paymentMethod?: string | null;
+  paymentStatus?: string | null;
+  items: AdminOrderItemsItem[];
+  createdAt: string;
+}
+
+export type UpdateOrderStatusBodyStatus =
+  (typeof UpdateOrderStatusBodyStatus)[keyof typeof UpdateOrderStatusBodyStatus];
+
+export const UpdateOrderStatusBodyStatus = {
+  confirmed: "confirmed",
+  processing: "processing",
+  shipped: "shipped",
+  delivered: "delivered",
+  cancelled: "cancelled",
+} as const;
+
+export interface UpdateOrderStatusBody {
+  status: UpdateOrderStatusBodyStatus;
+}
+
+export interface AdminStats {
+  totalOrders: number;
+  totalRevenue: number;
+  totalCustomers: number;
+  totalProducts: number;
+  pendingOrders: number;
+  recentOrders: AdminOrder[];
 }
 
 export type ListProductsParams = {

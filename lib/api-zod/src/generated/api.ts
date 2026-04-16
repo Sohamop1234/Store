@@ -8,7 +8,6 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -63,31 +62,6 @@ export const CreateProductBody = zod.object({
 });
 
 /**
- * @summary Get a product by ID
- */
-export const GetProductParams = zod.object({
-  id: zod.coerce.number(),
-});
-
-export const GetProductResponse = zod.object({
-  id: zod.number(),
-  name: zod.string(),
-  description: zod.string(),
-  price: zod.number(),
-  originalPrice: zod.number().nullish(),
-  category: zod.string(),
-  imageUrl: zod.string(),
-  images: zod.array(zod.string()),
-  inStock: zod.boolean(),
-  featured: zod.boolean(),
-  rating: zod.number(),
-  reviewCount: zod.number(),
-  material: zod.string(),
-  tags: zod.array(zod.string()),
-  createdAt: zod.string(),
-});
-
-/**
  * @summary Get featured products
  */
 export const GetFeaturedProductsResponseItem = zod.object({
@@ -120,6 +94,77 @@ export const GetCategoriesResponseItem = zod.object({
   imageUrl: zod.string(),
 });
 export const GetCategoriesResponse = zod.array(GetCategoriesResponseItem);
+
+/**
+ * @summary Get a product by ID
+ */
+export const GetProductParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProductResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string(),
+  price: zod.number(),
+  originalPrice: zod.number().nullish(),
+  category: zod.string(),
+  imageUrl: zod.string(),
+  images: zod.array(zod.string()),
+  inStock: zod.boolean(),
+  featured: zod.boolean(),
+  rating: zod.number(),
+  reviewCount: zod.number(),
+  material: zod.string(),
+  tags: zod.array(zod.string()),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Update a product
+ */
+export const UpdateProductParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateProductBody = zod.object({
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  price: zod.number().optional(),
+  originalPrice: zod.number().nullish(),
+  category: zod.string().optional(),
+  imageUrl: zod.string().optional(),
+  images: zod.array(zod.string()).optional(),
+  inStock: zod.boolean().optional(),
+  featured: zod.boolean().optional(),
+  material: zod.string().optional(),
+  tags: zod.array(zod.string()).optional(),
+});
+
+export const UpdateProductResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string(),
+  price: zod.number(),
+  originalPrice: zod.number().nullish(),
+  category: zod.string(),
+  imageUrl: zod.string(),
+  images: zod.array(zod.string()),
+  inStock: zod.boolean(),
+  featured: zod.boolean(),
+  rating: zod.number(),
+  reviewCount: zod.number(),
+  material: zod.string(),
+  tags: zod.array(zod.string()),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete a product
+ */
+export const DeleteProductParams = zod.object({
+  id: zod.coerce.number(),
+});
 
 /**
  * @summary Get current cart
@@ -283,4 +328,166 @@ export const PlaceOrderBody = zod.object({
   address: zod.string(),
   city: zod.string(),
   pincode: zod.string(),
+});
+
+/**
+ * @summary Create a payment for an order
+ */
+export const CreatePaymentBody = zod.object({
+  orderId: zod.number(),
+  method: zod.enum(["upi", "card", "cod"]),
+  upiId: zod.string().nullish(),
+  cardLast4: zod.string().nullish(),
+});
+
+/**
+ * @summary Confirm a payment
+ */
+export const ConfirmPaymentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ConfirmPaymentBody = zod.object({
+  transactionRef: zod.string(),
+});
+
+export const ConfirmPaymentResponse = zod.object({
+  id: zod.number(),
+  orderId: zod.number(),
+  method: zod.string(),
+  status: zod.string(),
+  amount: zod.number(),
+  transactionRef: zod.string().nullish(),
+  upiId: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary List all customers
+ */
+export const ListCustomersResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  email: zod.string(),
+  phone: zod.string(),
+  address: zod.string(),
+  city: zod.string(),
+  pincode: zod.string(),
+  totalOrders: zod.number(),
+  totalSpent: zod.number(),
+  createdAt: zod.string(),
+});
+export const ListCustomersResponse = zod.array(ListCustomersResponseItem);
+
+/**
+ * @summary Get customer by ID
+ */
+export const GetCustomerParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCustomerResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  email: zod.string(),
+  phone: zod.string(),
+  address: zod.string(),
+  city: zod.string(),
+  pincode: zod.string(),
+  totalOrders: zod.number(),
+  totalSpent: zod.number(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Admin login
+ */
+export const AdminLoginBody = zod.object({
+  password: zod.string(),
+});
+
+export const AdminLoginResponse = zod.object({
+  token: zod.string(),
+  success: zod.boolean(),
+});
+
+/**
+ * @summary List all orders (admin)
+ */
+export const AdminListOrdersResponseItem = zod.object({
+  id: zod.number(),
+  customerName: zod.string(),
+  customerEmail: zod.string(),
+  customerPhone: zod.string(),
+  address: zod.string(),
+  city: zod.string(),
+  pincode: zod.string(),
+  total: zod.number(),
+  status: zod.string(),
+  paymentMethod: zod.string().nullish(),
+  paymentStatus: zod.string().nullish(),
+  items: zod.array(zod.object({}).passthrough()),
+  createdAt: zod.string(),
+});
+export const AdminListOrdersResponse = zod.array(AdminListOrdersResponseItem);
+
+/**
+ * @summary Update order status
+ */
+export const AdminUpdateOrderStatusParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminUpdateOrderStatusBody = zod.object({
+  status: zod.enum([
+    "confirmed",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+  ]),
+});
+
+export const AdminUpdateOrderStatusResponse = zod.object({
+  id: zod.number(),
+  customerName: zod.string(),
+  customerEmail: zod.string(),
+  customerPhone: zod.string(),
+  address: zod.string(),
+  city: zod.string(),
+  pincode: zod.string(),
+  total: zod.number(),
+  status: zod.string(),
+  paymentMethod: zod.string().nullish(),
+  paymentStatus: zod.string().nullish(),
+  items: zod.array(zod.object({}).passthrough()),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Get admin dashboard stats
+ */
+export const AdminGetStatsResponse = zod.object({
+  totalOrders: zod.number(),
+  totalRevenue: zod.number(),
+  totalCustomers: zod.number(),
+  totalProducts: zod.number(),
+  pendingOrders: zod.number(),
+  recentOrders: zod.array(
+    zod.object({
+      id: zod.number(),
+      customerName: zod.string(),
+      customerEmail: zod.string(),
+      customerPhone: zod.string(),
+      address: zod.string(),
+      city: zod.string(),
+      pincode: zod.string(),
+      total: zod.number(),
+      status: zod.string(),
+      paymentMethod: zod.string().nullish(),
+      paymentStatus: zod.string().nullish(),
+      items: zod.array(zod.object({}).passthrough()),
+      createdAt: zod.string(),
+    }),
+  ),
 });

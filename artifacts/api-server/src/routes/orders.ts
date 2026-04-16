@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, cartItemsTable, productsTable, ordersTable } from "@workspace/db";
+import { db, cartItemsTable, productsTable, ordersTable, customersTable } from "@workspace/db";
 import { PlaceOrderBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -58,6 +58,38 @@ router.post("/orders", async (req, res): Promise<void> => {
       items,
     })
     .returning();
+
+  // Upsert customer — find existing by email or create new
+  const [existingCustomer] = await db
+    .select()
+    .from(customersTable)
+    .where(eq(customersTable.email, customerEmail));
+
+  if (existingCustomer) {
+    await db
+      .update(customersTable)
+      .set({
+        totalOrders: existingCustomer.totalOrders + 1,
+        totalSpent: existingCustomer.totalSpent + total,
+        // Update address info in case it changed
+        address,
+        city,
+        pincode,
+        phone: customerPhone,
+      })
+      .where(eq(customersTable.id, existingCustomer.id));
+  } else {
+    await db.insert(customersTable).values({
+      name: customerName,
+      email: customerEmail,
+      phone: customerPhone,
+      address,
+      city,
+      pincode,
+      totalOrders: 1,
+      totalSpent: total,
+    });
+  }
 
   // Clear cart
   await db

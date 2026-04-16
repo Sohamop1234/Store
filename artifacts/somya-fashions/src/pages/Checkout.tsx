@@ -78,7 +78,7 @@ export function Checkout() {
           // Generate a new session ID for future shopping
           localStorage.setItem("somya_session_id", crypto.randomUUID());
           
-          setLocation(`/order-success?id=${order.id}`);
+          setLocation(`/checkout/payment?orderId=${order.id}`);
         },
         onError: () => {
           toast({

@@ -16,13 +16,18 @@ tags:
     description: Shopping cart operations
   - name: orders
     description: Order operations
+  - name: customers
+    description: Customer operations
+  - name: payments
+    description: Payment operations
+  - name: admin
+    description: Admin panel operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -30,6 +35,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
   /products:
     get:
       operationId: listProducts
@@ -82,6 +88,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Product"
+
+  /products/featured:
+    get:
+      operationId: getFeaturedProducts
+      tags: [products]
+      summary: Get featured products
+      responses:
+        "200":
+          description: Featured products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/categories:
+    get:
+      operationId: getCategories
+      tags: [products]
+      summary: Get all product categories with counts
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategorySummary"
+
   /products/{id}:
     get:
       operationId: getProduct
@@ -102,34 +139,43 @@ paths:
                 $ref: "#/components/schemas/Product"
         "404":
           description: Not found
-  /products/featured:
-    get:
-      operationId: getFeaturedProducts
+    put:
+      operationId: updateProduct
       tags: [products]
-      summary: Get featured products
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductBody"
       responses:
         "200":
-          description: Featured products
+          description: Updated product
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Product"
-  /products/categories:
-    get:
-      operationId: getCategories
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
       tags: [products]
-      summary: Get all product categories with counts
+      summary: Delete a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
-        "200":
-          description: Categories with product counts
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CategorySummary"
+        "204":
+          description: Deleted
+
   /cart:
     get:
       operationId: getCart
@@ -165,6 +211,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Cart"
+
   /cart/{itemId}:
     put:
       operationId: updateCartItem
@@ -206,6 +253,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Cart"
+
   /orders:
     post:
       operationId: placeOrder
@@ -225,6 +273,158 @@ paths:
               schema:
                 $ref: "#/components/schemas/Order"
 
+  /payments:
+    post:
+      operationId: createPayment
+      tags: [payments]
+      summary: Create a payment for an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentBody"
+      responses:
+        "201":
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments/{id}/confirm:
+    post:
+      operationId: confirmPayment
+      tags: [payments]
+      summary: Confirm a payment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmPaymentBody"
+      responses:
+        "200":
+          description: Confirmed payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List all customers
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get customer by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginBody"
+      responses:
+        "200":
+          description: Login success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+        "401":
+          description: Unauthorized
+
+  /admin/orders:
+    get:
+      operationId: adminListOrders
+      tags: [admin]
+      summary: List all orders (admin)
+      responses:
+        "200":
+          description: All orders with customer and payment details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminOrder"
+
+  /admin/orders/{id}/status:
+    put:
+      operationId: adminUpdateOrderStatus
+      tags: [admin]
+      summary: Update order status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderStatusBody"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrder"
+
+  /admin/stats:
+    get:
+      operationId: adminGetStats
+      tags: [admin]
+      summary: Get admin dashboard stats
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
 components:
   schemas:
     HealthStatus:
@@ -232,8 +432,7 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     Product:
       type: object
@@ -331,6 +530,37 @@ components:
         - material
         - tags
 
+    UpdateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        originalPrice:
+          type: number
+          nullable: true
+        category:
+          type: string
+        imageUrl:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        inStock:
+          type: boolean
+        featured:
+          type: boolean
+        material:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
     CategorySummary:
       type: object
       properties:
@@ -340,10 +570,7 @@ components:
           type: integer
         imageUrl:
           type: string
-      required:
-        - name
-        - count
-        - imageUrl
+      required: [name, count, imageUrl]
 
     CartItem:
       type: object
@@ -356,11 +583,7 @@ components:
           $ref: "#/components/schemas/Product"
         quantity:
           type: integer
-      required:
-        - id
-        - productId
-        - product
-        - quantity
+      required: [id, productId, product, quantity]
 
     Cart:
       type: object
@@ -373,10 +596,7 @@ components:
           type: number
         itemCount:
           type: integer
-      required:
-        - items
-        - total
-        - itemCount
+      required: [items, total, itemCount]
 
     AddToCartBody:
       type: object
@@ -387,10 +607,7 @@ components:
           type: integer
         quantity:
           type: integer
-      required:
-        - sessionId
-        - productId
-        - quantity
+      required: [sessionId, productId, quantity]
 
     UpdateCartItemBody:
       type: object
@@ -399,9 +616,7 @@ components:
           type: string
         quantity:
           type: integer
-      required:
-        - sessionId
-        - quantity
+      required: [sessionId, quantity]
 
     PlaceOrderBody:
       type: object
@@ -448,11 +663,153 @@ components:
             $ref: "#/components/schemas/CartItem"
         createdAt:
           type: string
-      required:
-        - id
-        - customerName
-        - customerEmail
-        - total
-        - status
-        - items
-        - createdAt
+      required: [id, customerName, customerEmail, total, status, items, createdAt]
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        pincode:
+          type: string
+        totalOrders:
+          type: integer
+        totalSpent:
+          type: number
+        createdAt:
+          type: string
+      required: [id, name, email, phone, address, city, pincode, totalOrders, totalSpent, createdAt]
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+        method:
+          type: string
+        status:
+          type: string
+        amount:
+          type: number
+        transactionRef:
+          type: string
+          nullable: true
+        upiId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, orderId, method, status, amount, createdAt]
+
+    CreatePaymentBody:
+      type: object
+      properties:
+        orderId:
+          type: integer
+        method:
+          type: string
+          enum: [upi, card, cod]
+        upiId:
+          type: string
+          nullable: true
+        cardLast4:
+          type: string
+          nullable: true
+      required: [orderId, method]
+
+    ConfirmPaymentBody:
+      type: object
+      properties:
+        transactionRef:
+          type: string
+      required: [transactionRef]
+
+    AdminLoginBody:
+      type: object
+      properties:
+        password:
+          type: string
+      required: [password]
+
+    AdminLoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        success:
+          type: boolean
+      required: [token, success]
+
+    AdminOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+        customerPhone:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        pincode:
+          type: string
+        total:
+          type: number
+        status:
+          type: string
+        paymentMethod:
+          type: string
+          nullable: true
+        paymentStatus:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: string
+      required: [id, customerName, customerEmail, customerPhone, address, city, pincode, total, status, items, createdAt]
+
+    UpdateOrderStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [confirmed, processing, shipped, delivered, cancelled]
+      required: [status]
+
+    AdminStats:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        totalCustomers:
+          type: integer
+        totalProducts:
+          type: integer
+        pendingOrders:
+          type: integer
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOrder"
+      required: [totalOrders, totalRevenue, totalCustomers, totalProducts, pendingOrders, recentOrders]
