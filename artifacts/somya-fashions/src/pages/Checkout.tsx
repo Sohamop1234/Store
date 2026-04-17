@@ -5,15 +5,17 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getSessionId } from "@/lib/session";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, ChevronLeft, Loader2 } from "lucide-react";
+import { ShieldCheck, ChevronLeft, Loader2, LogIn } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useUser } from "@clerk/react";
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const checkoutSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
@@ -31,6 +33,7 @@ export function Checkout() {
   const sessionId = getSessionId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user, isLoaded: isUserLoaded } = useUser();
 
   const { data: cart, isLoading: isCartLoading } = useGetCart(
     { sessionId },
@@ -50,6 +53,18 @@ export function Checkout() {
       pincode: "",
     },
   });
+
+  // Pre-fill form with Clerk user data once loaded
+  useEffect(() => {
+    if (user && isUserLoaded) {
+      const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+      const email = user.emailAddresses[0]?.emailAddress || "";
+      const phone = user.phoneNumbers?.[0]?.phoneNumber || "";
+      if (fullName) form.setValue("customerName", fullName, { shouldValidate: false });
+      if (email) form.setValue("customerEmail", email, { shouldValidate: false });
+      if (phone) form.setValue("customerPhone", phone, { shouldValidate: false });
+    }
+  }, [user, isUserLoaded]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -74,10 +89,7 @@ export function Checkout() {
       {
         onSuccess: (order) => {
           queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId }) });
-          
-          // Generate a new session ID for future shopping
           localStorage.setItem("somya_session_id", crypto.randomUUID());
-          
           setLocation(`/checkout/payment?orderId=${order.id}`);
         },
         onError: () => {
@@ -106,16 +118,49 @@ export function Checkout() {
     );
   }
 
+  // Require sign-in before checkout
+  if (isUserLoaded && !user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Navbar />
+        <main className="flex-1 pt-32 pb-16 flex items-center justify-center">
+          <div className="max-w-sm w-full mx-auto px-4 text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+              <LogIn className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="font-serif text-2xl font-bold mb-3">Sign In to Continue</h2>
+            <p className="text-muted-foreground mb-8">
+              Please sign in or create an account to complete your purchase.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Link href="/sign-in">
+                <Button className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 uppercase tracking-wider">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/sign-up">
+                <Button variant="outline" className="w-full h-12 uppercase tracking-wider">
+                  Create Account
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      
+
       <main className="flex-1 pt-24 md:pt-32 pb-16">
         <div className="container mx-auto px-4 max-w-6xl">
           <Link href="/cart" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8">
             <ChevronLeft className="w-4 h-4 mr-1" /> Back to Cart
           </Link>
-          
+
           <h1 className="text-3xl md:text-5xl font-serif font-bold text-foreground mb-8">
             Checkout
           </h1>
@@ -123,9 +168,10 @@ export function Checkout() {
           <div className="flex flex-col lg:flex-row gap-12 lg:gap-24">
             {/* Checkout Form */}
             <div className="lg:w-1/2">
+              {/* Step 1 */}
               <div className="flex items-center gap-2 mb-6 pb-4 border-b border-border">
                 <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">1</div>
-                <h2 className="font-serif text-xl font-bold">Contact & Shipping Details</h2>
+                <h2 className="font-serif text-xl font-bold">Contact Details</h2>
               </div>
 
               <Form {...form}>
@@ -173,6 +219,12 @@ export function Checkout() {
                     )}
                   />
 
+                  {/* Step 2 - Shipping Address */}
+                  <div className="flex items-center gap-2 pt-4 pb-4 border-b border-border">
+                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">2</div>
+                    <h2 className="font-serif text-xl font-bold">Shipping Address</h2>
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="address"
@@ -216,24 +268,25 @@ export function Checkout() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-2 mt-8 pb-4 border-b border-border">
-                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">2</div>
+                  {/* Step 3 - Payment notice */}
+                  <div className="flex items-center gap-2 pt-4 pb-4 border-b border-border">
+                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">3</div>
                     <h2 className="font-serif text-xl font-bold">Payment</h2>
                   </div>
-                  
+
                   <div className="bg-muted p-4 rounded-lg flex items-start gap-4 border border-border">
                     <ShieldCheck className="w-6 h-6 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-medium mb-1">Secure Cash on Delivery</h4>
+                      <h4 className="font-medium mb-1">Choose Your Payment Method</h4>
                       <p className="text-sm text-muted-foreground">
-                        Pay with cash or UPI when your order is delivered to your doorstep.
+                        You'll select UPI, Card, or Cash on Delivery on the next step.
                       </p>
                     </div>
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    size="lg" 
+                  <Button
+                    type="submit"
+                    size="lg"
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-base uppercase tracking-wider mt-8"
                     disabled={placeOrderMutation.isPending}
                   >
@@ -242,7 +295,7 @@ export function Checkout() {
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...
                       </>
                     ) : (
-                      `Place Order • ₹${total.toFixed(2)}`
+                      `Continue to Payment • ₹${total.toFixed(2)}`
                     )}
                   </Button>
                 </form>
@@ -253,13 +306,13 @@ export function Checkout() {
             <div className="lg:w-1/2">
               <div className="bg-muted/30 border border-border rounded-lg p-6 lg:sticky lg:top-32">
                 <h2 className="font-serif text-xl font-bold mb-6">Order Summary</h2>
-                
+
                 <div className="space-y-4 mb-6 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
                   {cart.items.map((item) => (
                     <div key={item.id} className="flex gap-4">
                       <div className="w-16 aspect-[4/5] bg-muted rounded overflow-hidden shrink-0 relative">
-                        <img 
-                          src={item.product.imageUrl} 
+                        <img
+                          src={item.product.imageUrl}
                           alt={item.product.name}
                           className="w-full h-full object-cover"
                         />

@@ -1,9 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { ShoppingBag, Search, Menu, User } from "lucide-react";
+import { ShoppingBag, Search, Menu, LogIn, LogOut, UserCircle } from "lucide-react";
 import { useGetCart } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useUser, useClerk } from "@clerk/react";
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export function Navbar() {
   const [location] = useLocation();
@@ -11,6 +14,8 @@ export function Navbar() {
   const { data: cart } = useGetCart({ sessionId }, { query: { enabled: !!sessionId } });
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,6 +33,10 @@ export function Navbar() {
     { name: "Necklaces", href: "/shop?category=Necklaces" },
     { name: "Earrings", href: "/shop?category=Earrings" },
   ];
+
+  const handleSignOut = () => {
+    signOut({ redirectUrl: `${basePath}/` });
+  };
 
   return (
     <header
@@ -81,13 +90,48 @@ export function Navbar() {
                 </Link>
               ))}
             </div>
-            
+
             <button className="text-foreground hover:text-primary transition-colors">
               <Search className="w-5 h-5" />
             </button>
-            <button className="hidden md:block text-foreground hover:text-primary transition-colors">
-              <User className="w-5 h-5" />
-            </button>
+
+            {/* Auth button */}
+            <div className="hidden md:flex items-center">
+              {isLoaded && user ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {user.imageUrl ? (
+                      <img
+                        src={user.imageUrl}
+                        alt={user.firstName || "User"}
+                        className="w-7 h-7 rounded-full object-cover border border-border"
+                      />
+                    ) : (
+                      <UserCircle className="w-5 h-5 text-foreground" />
+                    )}
+                    <span className="text-sm text-muted-foreground hidden lg:block">
+                      {user.firstName || user.emailAddresses[0]?.emailAddress?.split("@")[0]}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : isLoaded ? (
+                <Link
+                  href="/sign-in"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span className="uppercase tracking-wider font-medium">Sign In</span>
+                </Link>
+              ) : null}
+            </div>
+
             <Link href="/cart" className="relative text-foreground hover:text-primary transition-colors">
               <ShoppingBag className="w-5 h-5" />
               {itemCount > 0 && (
@@ -114,6 +158,33 @@ export function Navbar() {
                 {link.name}
               </Link>
             ))}
+            <div className="border-t border-border mt-2 pt-2">
+              {user ? (
+                <button
+                  onClick={() => { setMobileMenuOpen(false); handleSignOut(); }}
+                  className="w-full text-left px-6 py-3 text-sm uppercase tracking-wider font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+              ) : (
+                <>
+                  <Link
+                    href="/sign-in"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-6 py-3 text-sm uppercase tracking-wider font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2"
+                  >
+                    <LogIn className="w-4 h-4" /> Sign In
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-6 py-3 text-sm uppercase tracking-wider font-medium text-primary hover:bg-muted transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
