@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { useGetCart, usePlaceOrder, getGetCartQueryKey } from "@workspace/api-client-react";
 import { Navbar } from "@/components/Navbar";
@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { getSessionId } from "@/lib/session";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, ChevronLeft, Loader2, LogIn } from "lucide-react";
+import { ShieldCheck, ChevronLeft, Loader2, LogIn, CheckCircle2, Smartphone } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from "@/components/ui/form";
 import { useUser } from "@clerk/react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -35,6 +37,15 @@ export function Checkout() {
   const { toast } = useToast();
   const { user, isLoaded: isUserLoaded } = useUser();
 
+  // OTP state
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpResendTimer, setOtpResendTimer] = useState(0);
+  const otpCodeRef = useRef<string>("");
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const { data: cart, isLoading: isCartLoading } = useGetCart(
     { sessionId },
     { query: { enabled: !!sessionId } }
@@ -54,7 +65,7 @@ export function Checkout() {
     },
   });
 
-  // Pre-fill form with Clerk user data once loaded
+  // Pre-fill form with Clerk user data
   useEffect(() => {
     if (user && isUserLoaded) {
       const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
@@ -62,9 +73,30 @@ export function Checkout() {
       const phone = user.phoneNumbers?.[0]?.phoneNumber || "";
       if (fullName) form.setValue("customerName", fullName, { shouldValidate: false });
       if (email) form.setValue("customerEmail", email, { shouldValidate: false });
-      if (phone) form.setValue("customerPhone", phone, { shouldValidate: false });
+      if (phone) {
+        form.setValue("customerPhone", phone, { shouldValidate: false });
+        // If phone comes from verified Clerk account, treat as already verified
+        if (user.phoneNumbers?.[0]?.verification?.status === "verified") {
+          setOtpVerified(true);
+        }
+      }
     }
   }, [user, isUserLoaded]);
+
+  // Reset OTP state when phone changes
+  const phoneValue = form.watch("customerPhone");
+  useEffect(() => {
+    setOtpSent(false);
+    setOtpInput("");
+    setOtpVerified(false);
+    otpCodeRef.current = "";
+    if (timerRef.current) clearInterval(timerRef.current);
+    setOtpResendTimer(0);
+  }, [phoneValue]);
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -72,33 +104,74 @@ export function Checkout() {
       toast({
         title: "Cart is empty",
         description: "Please add some items to your cart before checkout.",
-        variant: "destructive"
+        variant: "destructive",
       });
       setLocation("/shop");
     }
   }, [cart, isCartLoading, setLocation, toast]);
 
+  const startResendTimer = () => {
+    setOtpResendTimer(30);
+    timerRef.current = setInterval(() => {
+      setOtpResendTimer((t) => {
+        if (t <= 1) { clearInterval(timerRef.current!); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+  };
+
+  const sendOtp = async () => {
+    const phone = form.getValues("customerPhone");
+    if (phone.replace(/\D/g, "").length < 10) {
+      toast({ title: "Enter a valid phone number first", variant: "destructive" });
+      return;
+    }
+    setOtpSending(true);
+    await new Promise((r) => setTimeout(r, 1200)); // Simulate network call
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    otpCodeRef.current = code;
+    setOtpSent(true);
+    setOtpInput("");
+    setOtpSending(false);
+    startResendTimer();
+    // In production, this would call your SMS gateway (Twilio, etc.)
+    // For demo, we show the OTP in a toast
+    toast({
+      title: "OTP Sent",
+      description: `Demo OTP: ${code}  (In production this is sent via SMS)`,
+    });
+  };
+
+  const verifyOtp = () => {
+    if (otpInput.trim() === otpCodeRef.current) {
+      setOtpVerified(true);
+      toast({ title: "Phone verified!", description: "Your phone number has been confirmed." });
+    } else {
+      toast({ title: "Incorrect OTP", description: "Please check the code and try again.", variant: "destructive" });
+      setOtpInput("");
+    }
+  };
+
   const onSubmit = (data: CheckoutFormValues) => {
+    if (!otpVerified) {
+      toast({ title: "Phone not verified", description: "Please verify your phone number with OTP before continuing.", variant: "destructive" });
+      return;
+    }
     placeOrderMutation.mutate(
-      {
-        data: {
-          sessionId,
-          ...data,
-        },
-      },
+      { data: { sessionId, ...data } },
       {
         onSuccess: (order) => {
           queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId }) });
           localStorage.setItem("somya_session_id", crypto.randomUUID());
-          setLocation(`/checkout/payment?orderId=${order.id}`);
+          setLocation(`/checkout/payment?orderId=${order.id}&total=${total}`);
         },
         onError: () => {
           toast({
             title: "Checkout Failed",
             description: "There was a problem placing your order. Please try again.",
-            variant: "destructive"
+            variant: "destructive",
           });
-        }
+        },
       }
     );
   };
@@ -166,44 +239,29 @@ export function Checkout() {
           </h1>
 
           <div className="flex flex-col lg:flex-row gap-12 lg:gap-24">
-            {/* Checkout Form */}
             <div className="lg:w-1/2">
-              {/* Step 1 */}
-              <div className="flex items-center gap-2 mb-6 pb-4 border-b border-border">
-                <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">1</div>
-                <h2 className="font-serif text-xl font-bold">Contact Details</h2>
-              </div>
-
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="customerName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Jane Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="customerPhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+91 98765 43210" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+
+                  {/* Step 1: Contact */}
+                  <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
+                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">1</div>
+                    <h2 className="font-serif text-xl font-bold">Contact Details</h2>
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Jane Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -219,7 +277,82 @@ export function Checkout() {
                     )}
                   />
 
-                  {/* Step 2 - Shipping Address */}
+                  {/* Phone with OTP */}
+                  <FormField
+                    control={form.control}
+                    name="customerPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          Phone Number
+                          {otpVerified && (
+                            <span className="flex items-center gap-1 text-xs text-green-600 font-normal">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                            </span>
+                          )}
+                        </FormLabel>
+                        <FormControl>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="+91 98765 43210"
+                              {...field}
+                              disabled={otpVerified}
+                              className={otpVerified ? "bg-muted" : ""}
+                            />
+                            {!otpVerified && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="shrink-0 text-sm"
+                                onClick={sendOtp}
+                                disabled={otpSending || (otpSent && otpResendTimer > 0)}
+                              >
+                                {otpSending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : otpSent && otpResendTimer > 0 ? (
+                                  `Resend (${otpResendTimer}s)`
+                                ) : otpSent ? (
+                                  "Resend OTP"
+                                ) : (
+                                  "Send OTP"
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+
+                        {/* OTP input field */}
+                        {otpSent && !otpVerified && (
+                          <div className="mt-3 p-4 bg-muted/50 border border-border rounded-lg space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Smartphone className="w-4 h-4 text-primary shrink-0" />
+                              <span>Enter the 6-digit OTP sent to your phone</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="• • • • • •"
+                                maxLength={6}
+                                value={otpInput}
+                                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                className="text-center tracking-widest font-mono text-lg"
+                              />
+                              <Button
+                                type="button"
+                                onClick={verifyOtp}
+                                disabled={otpInput.length < 6}
+                                className="shrink-0"
+                              >
+                                Verify
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Step 2: Address */}
                   <div className="flex items-center gap-2 pt-4 pb-4 border-b border-border">
                     <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">2</div>
                     <h2 className="font-serif text-xl font-bold">Shipping Address</h2>
@@ -268,7 +401,7 @@ export function Checkout() {
                     />
                   </div>
 
-                  {/* Step 3 - Payment notice */}
+                  {/* Step 3: Payment notice */}
                   <div className="flex items-center gap-2 pt-4 pb-4 border-b border-border">
                     <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">3</div>
                     <h2 className="font-serif text-xl font-bold">Payment</h2>
@@ -288,12 +421,12 @@ export function Checkout() {
                     type="submit"
                     size="lg"
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-base uppercase tracking-wider mt-8"
-                    disabled={placeOrderMutation.isPending}
+                    disabled={placeOrderMutation.isPending || !otpVerified}
                   >
                     {placeOrderMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...
-                      </>
+                      <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...</>
+                    ) : !otpVerified ? (
+                      "Verify Phone to Continue"
                     ) : (
                       `Continue to Payment • ₹${total.toFixed(2)}`
                     )}
