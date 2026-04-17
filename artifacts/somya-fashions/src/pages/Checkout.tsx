@@ -43,7 +43,6 @@ export function Checkout() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [otpResendTimer, setOtpResendTimer] = useState(0);
-  const otpCodeRef = useRef<string>("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: cart, isLoading: isCartLoading } = useGetCart(
@@ -127,28 +126,46 @@ export function Checkout() {
       return;
     }
     setOtpSending(true);
-    await new Promise((r) => setTimeout(r, 1200)); // Simulate network call
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    otpCodeRef.current = code;
-    setOtpSent(true);
-    setOtpInput("");
-    setOtpSending(false);
-    startResendTimer();
-    // In production, this would call your SMS gateway (Twilio, etc.)
-    // For demo, we show the OTP in a toast
-    toast({
-      title: "OTP Sent",
-      description: `Demo OTP: ${code}  (In production this is sent via SMS)`,
-    });
+    try {
+      const res = await fetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed to send OTP", description: data.error || "Please try again.", variant: "destructive" });
+        return;
+      }
+      setOtpSent(true);
+      setOtpInput("");
+      startResendTimer();
+      toast({ title: "OTP Sent", description: "A 6-digit code has been sent to your phone via SMS." });
+    } catch {
+      toast({ title: "Network error", description: "Could not reach the server. Please try again.", variant: "destructive" });
+    } finally {
+      setOtpSending(false);
+    }
   };
 
-  const verifyOtp = () => {
-    if (otpInput.trim() === otpCodeRef.current) {
+  const verifyOtp = async () => {
+    const phone = form.getValues("customerPhone");
+    try {
+      const res = await fetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code: otpInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Verification failed", description: data.error || "Incorrect OTP.", variant: "destructive" });
+        setOtpInput("");
+        return;
+      }
       setOtpVerified(true);
       toast({ title: "Phone verified!", description: "Your phone number has been confirmed." });
-    } else {
-      toast({ title: "Incorrect OTP", description: "Please check the code and try again.", variant: "destructive" });
-      setOtpInput("");
+    } catch {
+      toast({ title: "Network error", description: "Could not reach the server. Please try again.", variant: "destructive" });
     }
   };
 
